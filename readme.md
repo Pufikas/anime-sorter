@@ -1,3 +1,5 @@
+Project built for `nvidia-cuda` gpus with `onnxruntime-gpu`
+
 # Set up a virtual environment for python
 `python3 -m venv pyenv`
 
