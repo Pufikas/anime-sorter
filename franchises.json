@@ -3,12 +3,63 @@
         "akiyama_mio"
     ],
 
+    "fate": [
+        "saber_alter",
+        "tohsaka_rin",
+        "illyasviel_von_einzbern"
+    ],
+
+    "lucky_star": [
+        "hiiragi_kagami",
+        "izumi_konata"
+    ],
+
     "vtubers": [
         "usada_pekora",
-        "gawr_gura"
+        "gawr_gura",
+        "hoshimachi_suisei",
+        "houshou_marine",
+        "watson_amelia",
+        "uruha_rushia",
+        "sakamata_chloe",
+        "shirogane_noel",
+        "ninomae_ina'nis",
+        "hoshimachi_suisei",
+        "shirakami_fubuki",
+        "minato_aqua",
+        "la+_darknesss",
+        "mori_calliope",
+        "murasaki_shion",
+        "nakiri_ayame",
+        "kureiji_ollie"
+    ],
+
+    "bocchi_the_rock": [
+        "ijichi_nijika",
+        "kita_ikuyo"
+    ],
+
+    "sousou_no_frieren": [
+        "frieren"
+    ],
+
+    "genshin_impact": [
+        "kamisato_ayaka",
+        "raiden_shogun"
     ],
 
     "touhou": [
+        "hinanawi_tenshi",
+        "tatara_kogasa",
+        "komeiji_koishi",
+        "komeiji_satori",
+        "konpaku_youmu",
+        "maribel_hearn",
+        "shameimaru_aya",
+        "saigyouji_yuyuko",
+        "kagiyama_hina",
+        "ibuki_suika",
+        "kaenbyou_rin",
         "yakumo_yukari",
         "reiuji_utsuho",
         "hakurei_reimu",
@@ -119,12 +170,16 @@
         "orange",
         "kurumi",
         "meira",
-        "marisa_kirisame"
+        "marisa_kirisame",
+        "usami_renko"
     ],
 
     "vocaloid": [
         "adachi_rei",
         "hatsune_miku",
+        "magical_mirai_miku",
+        "racing_miku",
+        "yuki_miku",
         "kagamine_rin",
         "kagamine_len",
         "megurine_luka",
@@ -135,6 +190,7 @@
         "akita_neru",
         "momone_momo",
         "namine_ritsu",
-        "yufu_sekai"
+        "yufu_sekai",
+        "touhoku_kiritan"
     ]
 }

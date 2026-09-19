@@ -57,20 +57,19 @@ def get_character(file):
 
 def group_to_franchise(character):
     parts = character.split("_(") # artoria_pendragon(fate) => ['artoria_pendragon', 'fate)']
+    character_name = parts[0]
 
-    if len(parts) == 2:
-        character_name = format_name(parts[0])
-        franchise = format_name(parts[1].rstrip(")")) # gets franchise from the file name tag
-
-        return os.path.join(franchise, character_name)
-    
-    # from the local franchise list group character
-    franchise = FRANCHISES.get(character)
-
+    franchise = FRANCHISES.get(character_name) # from the local franchise list group character
     if franchise:
-        return os.path.join(format_name(franchise), format_name(character))
+        return os.path.join(format_name(franchise), format_name(character_name))
+    
+    # if character_name doesnt match in local franchise tags
+    if len(parts) == 2:
+        franchise = format_name(parts[1].rstrip(")"))
+        return os.path.join(format_name(franchise), format_name(character_name))
 
-    return format_name(character)
+    # no franchise
+    return format_name(character_name)
 
 def create_folder(path):
     os.makedirs(path, exist_ok=True)
