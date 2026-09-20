@@ -6,10 +6,10 @@ ort.preload_dlls(directory="")
 
 from imgutils.tagging import get_wd14_tags
 
-dir_path = "test/input"
-unknown_char_path = "test/unknown"
-recognized_path = "test/output"
-backup_path = "test/backup"
+dir_path = "sorter/input"
+unknown_char_path = "sorter/unknown"
+recognized_path = "sorter/output"
+backup_path = "sorter/backup"
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
