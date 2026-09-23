@@ -5,6 +5,12 @@ import onnxruntime as ort
 ort.preload_dlls(directory="")
 
 from imgutils.tagging import get_wd14_tags
+from datasets import load_dataset
+
+dataset = load_dataset(
+    "tirta123/noob-wiki",
+    split="train"
+)
 
 dir_path = "sorter/input"
 unknown_char_path = "sorter/unknown"
@@ -13,13 +19,16 @@ backup_path = "sorter/backup"
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
+
 with open("franchises.json", "r", encoding="utf-8") as f:
     franchise_data = json.load(f)
 
-FRANCHISES = {
-    character: franchise # "hakurei_reimu": "touhou"
-    for franchise, characters in franchise_data.items() # get all characters in touhou
-    for character in characters # loop in touhou characters
+ALIASES = franchise_data.get("overrides", {})
+CUSTOM_GROUPS = franchise_data.get("franchise_groups", {})
+
+DATASET_FRANCHISES = {
+    row["character"]: row["copyright"]
+    for row in dataset
 }
 
 def list_files(path="."):
@@ -56,20 +65,41 @@ def get_character(file):
     print(file, character, "{:.2f}".format(confidence))
 
 def group_to_franchise(character):
-    parts = character.split("_(") # artoria_pendragon(fate) => ['artoria_pendragon', 'fate)']
-    character_name = parts[0]
+    character = ALIASES.get(character, character)
 
-    franchise = FRANCHISES.get(character_name) # from the local franchise list group character
-    if franchise:
-        return os.path.join(format_name(franchise), format_name(character_name))
+    # user defined franchise
+    for franchise, characters in CUSTOM_GROUPS.items():
+        if character in characters:
+            return os.path.join(
+                format_name(franchise),
+                format_name(character)
+            )
     
-    # if character_name doesnt match in local franchise tags
-    if len(parts) == 2:
-        franchise = format_name(parts[1].rstrip(")"))
-        return os.path.join(format_name(franchise), format_name(character_name))
+    # tirta123 dataset franchise
+    franchise = DATASET_FRANCHISES.get(character)
 
-    # no franchise
-    return format_name(character_name)
+    if franchise:
+        character_name = character.split("_(")[0]
+
+        return os.path.join(
+            format_name(franchise),
+            format_name(character_name)
+        )
+
+    # WD14 default group
+    parts = character.split("_(")
+
+    if len(parts) == 2:
+        character_name = parts[0]
+        franchise = parts[1].rstrip(")")
+
+        return os.path.join(
+            format_name(franchise),
+            format_name(character_name)
+        )
+    
+    # no franchise found
+    return format_name(character)
 
 def create_folder(path):
     os.makedirs(path, exist_ok=True)
