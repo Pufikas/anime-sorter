@@ -12,13 +12,14 @@ dataset = load_dataset(
     split="train"
 )
 
-dir_path = "sorter/input"
-unknown_char_path = "sorter/unknown"
-recognized_path = "sorter/output"
-backup_path = "sorter/backup"
+# configure these as you see fit
+INPUT_PATH = "sorter/input" # input folder to process images from
+UNKNOWN_PATH = "sorter/unknown" # not recognized images
+OUTPUT_PATH = "sorter/output" # recognized and tagged images folder output
+BACKUP_PATH = "sorter/backup" # path to backup images from INPUT_PATH
+REMOVE_EMPTY_FOLDERS = True # should it remove empty folders from INPUT_PATH?
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-
 
 with open("franchises.json", "r", encoding="utf-8") as f:
     franchise_data = json.load(f)
@@ -37,6 +38,10 @@ def list_files(path="."):
         
         if os.path.isdir(full_path):
             list_files(full_path)
+            
+            if not os.listdir(full_path) and REMOVE_EMPTY_FOLDERS: # remove empty dir
+                os.rmdir(full_path)
+
         elif os.path.splitext(full_path)[1].lower() in IMAGE_EXTENSIONS:
             get_character(full_path)
 
@@ -45,7 +50,8 @@ def get_character(file):
 
     # it's possible that the model will throw `characters = {}`
     if not characters:
-        move_to_location(file, unknown_char_path)
+        destination = move_to_location(file, UNKNOWN_PATH)
+        print(f"[UNKNOWN] {destination} -> No character detected")
         return
 
     character, confidence = max(
@@ -56,14 +62,14 @@ def get_character(file):
     if confidence >= 0.80:
         character_path = group_to_franchise(character)
 
-        copy_to_location(file, character_path)
-        move_to_location(file, backup_path)
+        destination = copy_to_location(file, character_path)
+        move_to_location(file, BACKUP_PATH)
+
+        print(f"[OK] {destination} -> {character} ({confidence:.2f})")
     else:
-        move_to_location(file, unknown_char_path)
+        destination = move_to_location(file, UNKNOWN_PATH)
+        print(f"[UNKNOWN] {destination} -> {character} ({confidence:.2f})")
     
-
-    print(file, character, "{:.2f}".format(confidence))
-
 def group_to_franchise(character):
     character = ALIASES.get(character, character)
 
@@ -117,13 +123,15 @@ def move_to_location(file, location):
     )
 
     shutil.move(file, destination)
+    
+    return destination
 
 # copies file to recongnized character folder, else moves to unknown character folder
 def copy_to_location(file, character=None):
     if character:
-        path = os.path.join(recognized_path, character)
+        path = os.path.join(OUTPUT_PATH, character)
     else:
-        path = unknown_char_path
+        path = UNKNOWN_PATH
 
     create_folder(path)
 
@@ -134,4 +142,6 @@ def copy_to_location(file, character=None):
 
     shutil.copy2(file, destination)
 
-list_files(dir_path)
+    return destination
+
+list_files(INPUT_PATH)

@@ -52,37 +52,48 @@ python script.py
 
 ## Customizing franchises
 
-Character/franchise mappings can be configured in:
+The sorter uses the [tirta123/noob-wiki](https://huggingface.co/datasets/tirta123/noob-wiki) dataset to automatically determine character franchises.
+
+Custom character grouping and overrides can be configured in:
 
 ```text
 franchises.json
 ```
 
-This allows characters to be grouped into franchise folders, if they are missing tags from `wd14` library, or to keep the folders organized.
-
 For example:
 
 ```json
 {
-    "BRS": [
-        "black_rock_shooter"
-    ],
+    "overrides": {
+        "sakura_miku": "hatsune_miku",
+        "racing_miku": "hatsune_miku"
+    },
 
-    "sousou_no_frieren": [
-        "frieren"
-    ],
+    "franchise_groups": {
+        "BRS": [
+            "black_rock_shooter"
+        ],
+        "sousou_no_frieren": [
+            "frieren"
+        ]
+    }
 }
 ```
 
-In this example this will create `BRS/Black_Rock_Shooter` and `Sousou_No_Frieren/Frieren` folders.
+`overrides` can be used to treat character variants as the same character. For example, `sakura_miku` and `racing_miku` can be sorted into the `Hatsune_Miku` folder.
 
-For example, `black_rock_shooter` may be detected by `WD14` as `black_rock_shooter_(character)`. Without a custom mapping, this would result in a `character` folder being created instead of `BRS`.
+`franchise_groups` can be used to manually group characters into a franchise. In this example, the sorter will create:
 
-Some characters also do not have a franchise tag in their `WD14` name. For example, `frieren` does not contain the `sousou_no_frieren` franchise tag, while `fern` does. Adding `frieren` to `franchises.json` allows it to be grouped correctly.
+```text
+BRS/Black_Rock_Shooter/
+
+Sousou_No_Frieren/Frieren/
+```
+
+This is useful for characters such as `black_rock_shooter`, which may be detected by WD14 as `black_rock_shooter_(character)`, or `frieren`, which does not have a franchise tag in its WD14 name.
 
 > [!TIP]
-> It is recommended to update `franchises.json` periodically 
-
+> It is recommended to update `franchises.json` periodically if you encounter characters that are sorted incorrectly.
 
 ## GPU
 
@@ -90,4 +101,4 @@ Uses `onnxruntime-gpu` for GPU-accelerated image tagging.
 
 The exact CUDA/cuDNN requirements depend on the installed ONNX Runtime version and your NVIDIA driver.
 
-It is also possible to run this project with `onxruntime` using only CPU, but will result in much slower process.
+It is also possible to run this project with `onnxruntime` using only the CPU, but the sorting process will be much slower.
