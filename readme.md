@@ -18,33 +18,39 @@ Unrecognized or low-confidence characters are placed in the `unknown` folder.
 
 ## Setup
 
-Create a Python virtual environment:
+1. Create a Python virtual environment:
 
 ```bash
 python3 -m venv pyenv
 ```
 
-### Windows
+
+2. Use the created virtual environment:
+
+##### on windows
 
 ```powershell
 pyenv\Scripts\activate
 ```
 
-### macOS / Linux
+##### on macOS / linux
 
 ```bash
 source pyenv/bin/activate
 ```
 
-Install the required packages:
+3. Install the required packages:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+4. Usage
 
-Place the images you want to sort in the input folder and run the sorter:
+Place the images *(or folders with images)* you want to sort in the input folder and run the sorter:
+
+> [!TIP]
+> Configure your own custom paths inside `script.py` file
 
 ```bash
 python script.py
@@ -70,10 +76,11 @@ For example:
     },
 
     "franchise_groups": {
-        "BRS": [
-            "black_rock_shooter"
+        "BRS": [ // folder name
+            "black_rock_shooter", // character name
+            "dead_master" // character name
         ],
-        "sousou_no_frieren": [
+        "Sousou_No_Frieren": [
             "frieren"
         ]
     }

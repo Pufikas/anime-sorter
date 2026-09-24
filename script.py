@@ -72,21 +72,20 @@ def get_character(file):
     
 def group_to_franchise(character):
     character = ALIASES.get(character, character)
+    character_name = character.split("_(")[0] # get only character name with no franchise WD14 tag (mona_(genshin_impact) => mona)
 
     # user defined franchise
     for franchise, characters in CUSTOM_GROUPS.items():
-        if character in characters:
+        if character_name in characters:
             return os.path.join(
-                format_name(franchise),
-                format_name(character)
+                franchise,
+                format_name(character_name)
             )
     
     # tirta123 dataset franchise
     franchise = DATASET_FRANCHISES.get(character)
 
-    if franchise:
-        character_name = character.split("_(")[0]
-
+    if franchise: 
         return os.path.join(
             format_name(franchise),
             format_name(character_name)
@@ -96,7 +95,6 @@ def group_to_franchise(character):
     parts = character.split("_(")
 
     if len(parts) == 2:
-        character_name = parts[0]
         franchise = parts[1].rstrip(")")
 
         return os.path.join(
@@ -105,7 +103,7 @@ def group_to_franchise(character):
         )
     
     # no franchise found
-    return format_name(character)
+    return format_name(character_name)
 
 def create_folder(path):
     os.makedirs(path, exist_ok=True)
