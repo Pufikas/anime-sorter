@@ -12,9 +12,10 @@ Unrecognized or low-confidence characters are placed in the `unknown` folder.
 
 ## Requirements
 
-* Python 3
-* NVIDIA GPU with CUDA support
-* `onnxruntime-gpu`
+- Python 3
+- NVIDIA GPU for CUDA acceleration, or
+- Compatible AMD GPU for ROCm/MIGraphX acceleration, or
+- CPU
 
 ## Setup
 
@@ -39,10 +40,28 @@ pyenv\Scripts\activate
 source pyenv/bin/activate
 ```
 
-3. Install the required packages:
+3. Install the required packages for your setup:
 
+install base requirements
 ```bash
 pip install -r requirements.txt
+```
+
+#### NVIDIA GPU
+```bash
+pip install -r requirements-nvidia.txt
+```
+The exact CUDA/cuDNN requirements depend on the installed ONNX Runtime version and your NVIDIA driver.
+
+#### AMD GPU
+```bash
+pip install -r requirements-amd.txt
+```
+AMD GPU acceleration requires a compatible ROCm/MIGraphX setup. GPU and operating-system support depends on the specific AMD GPU and ROCm version.
+
+#### CPU only
+```bash
+pip install -r requirements-cpu.txt
 ```
 
 4. Usage
