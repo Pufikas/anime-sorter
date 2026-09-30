@@ -2,19 +2,22 @@
 
 Detects anime characters from images and sorts them into folders.
 
+Uses the [tirta123/noob-wiki](https://huggingface.co/datasets/tirta123/noob-wiki) dataset to automatically determine character franchises.
+
 > [!WARNING]
 > Character detection and franchise grouping may not always be correct. It is recommended to briefly check the generated folders after sorting.
 
 Unrecognized or low-confidence characters are placed in the `unknown` folder.
 
 > [!TIP]
-> Use `franchises.json` to customize character/franchise sorting and improve organization.
+> Use `settings.json` to customize character/franchise sorting and improve organization.
+> See usage [here](#settingsjson)
 
 ## Requirements
 
 - Python 3
-- NVIDIA GPU for CUDA acceleration, or
-- Compatible AMD GPU for ROCm/MIGraphX acceleration, or
+- NVIDIA GPU for CUDA acceleration, **or**
+- Compatible AMD GPU for ROCm/MIGraphX acceleration, **or**
 - CPU
 
 ## Setup
@@ -24,17 +27,15 @@ Unrecognized or low-confidence characters are placed in the `unknown` folder.
 ```bash
 python3 -m venv pyenv
 ```
-
-
 2. Use the created virtual environment:
 
-##### on windows
+##### on Windows
 
 ```powershell
 pyenv\Scripts\activate
 ```
 
-##### on macOS / linux
+##### on MacOS / Linux
 
 ```bash
 source pyenv/bin/activate
@@ -42,22 +43,28 @@ source pyenv/bin/activate
 
 3. Install the required packages for your setup:
 
-install base requirements
+Install base requirements, then install the extra requirements for your hardware. If you have no GPU, use the CPU-only requirements.
+
+#### BASE Packages
 ```bash
 pip install -r requirements.txt
 ```
 
-#### NVIDIA GPU
+#### NVIDIA GPU (CUDA)
 ```bash
 pip install -r requirements-nvidia.txt
 ```
 The exact CUDA/cuDNN requirements depend on the installed ONNX Runtime version and your NVIDIA driver.
 
-#### AMD GPU
+#### AMD GPU / DirectML (Windows)
 ```bash
-pip install -r requirements-amd.txt
+pip install onnxruntime-directml
 ```
-AMD GPU acceleration requires a compatible ROCm/MIGraphX setup. GPU and operating-system support depends on the specific AMD GPU and ROCm version.
+
+#### AMD GPU / Rocm (Linux)
+```bash
+pip3 install https://repo.radeon.com/rocm/manylinux/rocm-rel-6.1.3/onnxruntime_rocm-1.17.0-cp310-cp310-linux_x86_64.whl numpy==1.26.4
+```
 
 #### CPU only
 ```bash
@@ -68,36 +75,41 @@ pip install -r requirements-cpu.txt
 
 Place the images *(or folders with images)* you want to sort in the input folder and run the sorter:
 
-> [!TIP]
-> Configure your own custom paths inside `script.py` file
-
 ```bash
 python script.py
 ```
 
-## Customizing franchises
-
-The sorter uses the [tirta123/noob-wiki](https://huggingface.co/datasets/tirta123/noob-wiki) dataset to automatically determine character franchises.
+## settingsjson
 
 Custom character grouping and overrides can be configured in:
 
-```text
-franchises.json
-```
-
-For example:
-
 ```json
 {
+    "settings": {
+        "CONFIDENCE": 0.80, // 1 is highest and confident of recognized character
+        
+        "CREATE_CHARACTER_FOLDER": true, // 
+        "CHARACTER_FOLDER_MIN_COUNT": 15, // treshold to create a character name
+        "REMOVE_EMPTY_FOLDERS": true, // remove empty folders in INPUT_PATH
+
+        "INPUT_PATH": "sorter/input", // input folder to process images from
+        "UNKNOWN_PATH": "sorter/unknown", // not recognized images
+        "OUTPUT_PATH": "sorter/output", // recognized and tagged images folder output
+        "BACKUP_PATH": "sorter/backup" // path to backup images from INPUT_PATH
+    },
+
     "overrides": {
-        "sakura_miku": "hatsune_miku",
-        "racing_miku": "hatsune_miku"
+        "sakura_miku": "hatsune_miku", // detected character name, overriden to character name
+        "racing_miku": "hatsune_miku",
+        "snow_miku": "hatsune_miku",
+        "uruha_rushia_(3rd_costume)": "uruha_rushia",
+        "boo_tao": "hu_tao"
     },
 
     "franchise_groups": {
         "BRS": [ // folder name
             "black_rock_shooter", // character name
-            "dead_master" // character name
+            "dead_master"
         ],
         "Sousou_No_Frieren": [
             "frieren"
@@ -117,14 +129,3 @@ Sousou_No_Frieren/Frieren/
 ```
 
 This is useful for characters such as `black_rock_shooter`, which may be detected by WD14 as `black_rock_shooter_(character)`, or `frieren`, which does not have a franchise tag in its WD14 name.
-
-> [!TIP]
-> It is recommended to update `franchises.json` periodically if you encounter characters that are sorted incorrectly.
-
-## GPU
-
-Uses `onnxruntime-gpu` for GPU-accelerated image tagging.
-
-The exact CUDA/cuDNN requirements depend on the installed ONNX Runtime version and your NVIDIA driver.
-
-It is also possible to run this project with `onnxruntime` using only the CPU, but the sorting process will be much slower.

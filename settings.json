@@ -1,0 +1,32 @@
+{
+    "settings": {
+        "CONFIDENCE": 0.80,
+        
+        "CREATE_CHARACTER_FOLDER": true,
+        "CHARACTER_FOLDER_MIN_COUNT": 15,
+        "REMOVE_EMPTY_FOLDERS": true,
+
+        "INPUT_PATH": "sorter/input",
+        "UNKNOWN_PATH": "sorter/unknown",
+        "OUTPUT_PATH": "sorter/output",
+        "BACKUP_PATH": "sorter/backup"
+    },
+
+    "overrides": {
+        "sakura_miku": "hatsune_miku",
+        "racing_miku": "hatsune_miku",
+        "snow_miku": "hatsune_miku",
+        "uruha_rushia_(3rd_costume)": "uruha_rushia",
+        "boo_tao": "hu_tao"
+    },
+
+    "franchise_groups": {
+        "BRS": [
+            "black_rock_shooter",
+            "dead_master"
+        ],
+        "Sousou_No_Frieren": [
+            "frieren"
+        ]
+    }
+}

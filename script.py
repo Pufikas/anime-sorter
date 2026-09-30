@@ -1,7 +1,9 @@
 import os
+from collections import Counter, defaultdict
 import shutil
 import json
 import onnxruntime as ort
+from tqdm import tqdm
 ort.preload_dlls(directory="")
 
 from imgutils.tagging import get_wd14_tags
@@ -12,17 +14,21 @@ dataset = load_dataset(
     split="train"
 )
 
-# configure these as you see fit
-INPUT_PATH = "sorter/input" # input folder to process images from
-UNKNOWN_PATH = "sorter/unknown" # not recognized images
-OUTPUT_PATH = "sorter/output" # recognized and tagged images folder output
-BACKUP_PATH = "sorter/backup" # path to backup images from INPUT_PATH
-REMOVE_EMPTY_FOLDERS = True # should it remove empty folders from INPUT_PATH?
+with open("settings.json", "r", encoding="utf-8") as f:
+    franchise_data = json.load(f)
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
-with open("franchises.json", "r", encoding="utf-8") as f:
-    franchise_data = json.load(f)
+SETTINGS = franchise_data.get("settings", {})
+CONFIDENCE = SETTINGS.get("CONFIDENCE", 0.80)
+CREATE_CHARACTER_FOLDER = SETTINGS.get("CREATE_CHARACTER_FOLDER", True)
+REMOVE_EMPTY_FOLDERS = SETTINGS.get("REMOVE_EMPTY_FOLDERS", True)
+CHARACTER_FOLDER_MIN_COUNT = SETTINGS.get("CHARACTER_FOLDER_MIN_COUNT", 20)
+
+INPUT_PATH = SETTINGS.get("INPUT_PATH")
+UNKNOWN_PATH = SETTINGS.get("UNKNOWN_PATH")
+OUTPUT_PATH = SETTINGS.get("OUTPUT_PATH")
+BACKUP_PATH = SETTINGS.get("BACKUP_PATH")
 
 ALIASES = franchise_data.get("overrides", {})
 CUSTOM_GROUPS = franchise_data.get("franchise_groups", {})
@@ -32,26 +38,43 @@ DATASET_FRANCHISES = {
     for row in dataset
 }
 
+results = [] # sorting results
+
 def list_files(path="."):
+    files = []
     for e in os.listdir(path):
         full_path = os.path.join(path, e)
         
         if os.path.isdir(full_path):
-            list_files(full_path)
+            files.extend(list_files(full_path))
             
-            if not os.listdir(full_path) and REMOVE_EMPTY_FOLDERS: # remove empty dir
-                os.rmdir(full_path)
-
         elif os.path.splitext(full_path)[1].lower() in IMAGE_EXTENSIONS:
-            get_character(full_path)
+            files.append(full_path)
+
+    return files
+
+JUNK_FILES = {".ds_store", "thumbs.db", "desktop.ini", ".directory"}
+
+def remove_empty_folders(path):
+    for root, dirs, files in os.walk(path, topdown=False):
+        for directory in dirs:
+            full_path = os.path.join(root, directory)
+
+            if not os.listdir(full_path):
+                os.rmdir(full_path)
 
 def get_character(file):
     rating, features, characters = get_wd14_tags(file)
 
     # it's possible that the model will throw `characters = {}`
     if not characters:
-        destination = move_to_location(file, UNKNOWN_PATH)
-        print(f"[UNKNOWN] {destination} -> No character detected")
+        results.append({
+            "file": file,
+            "character": None,
+            "confidence": 0,
+            "franchise": None,
+        })
+
         return
 
     character, confidence = max(
@@ -59,51 +82,64 @@ def get_character(file):
         key = lambda item: item[1] # for each item use the second element (0,91)
     )
 
-    if confidence >= 0.80:
-        character_path = group_to_franchise(character)
+    group_confidence(character, confidence, file)
 
-        destination = copy_to_location(file, character_path)
-        move_to_location(file, BACKUP_PATH)
+def group_confidence(character, confidence, file):
+    if confidence < CONFIDENCE:
+        results.append({
+            "file": file,
+            "character": character,
+            "confidence": confidence,
+            "franchise": None,
+        })
+        return
 
-        print(f"[OK] {destination} -> {character} ({confidence:.2f})")
-    else:
-        destination = move_to_location(file, UNKNOWN_PATH)
-        print(f"[UNKNOWN] {destination} -> {character} ({confidence:.2f})")
-    
-def group_to_franchise(character):
+    franchise, character_name = get_franchise(character)
+
+    results.append({
+        "file": file,
+        "character": character_name,
+        "confidence": confidence,
+        "franchise": franchise,
+    })
+            
+def get_franchise(character):
     character = ALIASES.get(character, character)
-    character_name = character.split("_(")[0] # get only character name with no franchise WD14 tag (mona_(genshin_impact) => mona)
+    # get only character name with no franchise WD14 tag (mona_(genshin_impact) => mona)
+    character_name = character.split("_(")[0]
 
     # user defined franchise
     for franchise, characters in CUSTOM_GROUPS.items():
         if character_name in characters:
-            return os.path.join(
-                franchise,
-                format_name(character_name)
-            )
-    
+            return franchise, character_name
+
     # tirta123 dataset franchise
     franchise = DATASET_FRANCHISES.get(character)
 
-    if franchise: 
-        return os.path.join(
-            format_name(franchise),
-            format_name(character_name)
-        )
+    if franchise:
+        return franchise, character_name
 
     # WD14 default group
     parts = character.split("_(")
 
     if len(parts) == 2:
         franchise = parts[1].rstrip(")")
+        return franchise, character_name
 
-        return os.path.join(
-            format_name(franchise),
-            format_name(character_name)
-        )
-    
     # no franchise found
-    return format_name(character_name)
+    return None, character_name
+
+def group_to_franchise(franchise, character, character_count):
+    if franchise is None:
+        return format_name(character_name)
+
+    f = format_name(franchise)
+    c = format_name(character)
+
+    if (CREATE_CHARACTER_FOLDER and character_count >= CHARACTER_FOLDER_MIN_COUNT):
+        return os.path.join(f, c)
+
+    return f
 
 def create_folder(path):
     os.makedirs(path, exist_ok=True)
@@ -142,4 +178,68 @@ def copy_to_location(file, character=None):
 
     return destination
 
-list_files(INPUT_PATH)
+def finalize():
+    character_counts = Counter(
+        result["character"]
+        for result in results
+        if result["character"] is not None
+    )
+
+    for result in results:
+        file = result["file"]
+        character = result["character"]
+        confidence = result["confidence"]
+        franchise = result["franchise"]
+
+        # no char or low confidence moves to unknown path
+        if character is None or confidence < CONFIDENCE:
+            destination = move_to_location(file, UNKNOWN_PATH)
+            continue
+
+        character_path = group_to_franchise(
+            result["franchise"],
+            character,
+            character_counts[character]
+        )
+
+        destination = copy_to_location(file, character_path)
+        move_to_location(file, BACKUP_PATH)
+
+    if REMOVE_EMPTY_FOLDERS:
+        remove_empty_folders(INPUT_PATH)
+
+    print_results()
+
+def print_results():
+    recognized = 0
+    unknown = 0
+    franchises = defaultdict(Counter)
+
+    for result in results:
+        character = result["character"]
+        confidence = result["confidence"]
+
+        if character is None or confidence < CONFIDENCE:
+            unknown += 1
+            continue
+
+        recognized += 1
+
+        franchise = result["franchise"] or None
+        franchises[franchise][character] += 1
+
+    print(f"\nRecognized         {recognized}")
+    print(f"Unknown            {unknown}\n")
+
+    for franchise, characters in franchises.items():
+        print("\n", franchise)
+
+        for character, count in characters.most_common():
+            print(f"  {character:<25} {count}")
+
+files = list_files(INPUT_PATH)
+
+for file in tqdm(files, desc="Analyzing", unit="image"):
+    get_character(file)
+    
+finalize()
