@@ -86,11 +86,11 @@ Custom character grouping and overrides can be configured in:
 ```json
 {
     "settings": {
-        "CONFIDENCE": 0.80, // 1 is highest and confident of recognized character
+        "CONFIDENCE": 0.80, // 1 is highest
         
-        "CREATE_CHARACTER_FOLDER": true, // 
-        "CHARACTER_FOLDER_MIN_COUNT": 15, // treshold to create a character name
-        "REMOVE_EMPTY_FOLDERS": true, // remove empty folders in INPUT_PATH
+        "CREATE_CHARACTER_FOLDER": true, // create folder for character?
+        "CHARACTER_FOLDER_MIN_COUNT": 15, // min count of images to create the character name folder
+        "REMOVE_EMPTY_FOLDERS": true, // remove empty folders in INPUT_PATH?
 
         "INPUT_PATH": "sorter/input", // input folder to process images from
         "UNKNOWN_PATH": "sorter/unknown", // not recognized images
