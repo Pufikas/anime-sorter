@@ -32,6 +32,7 @@ BACKUP_PATH = SETTINGS.get("BACKUP_PATH")
 
 ALIASES = franchise_data.get("overrides", {})
 CUSTOM_GROUPS = franchise_data.get("franchise_groups", {})
+INVALID_SYMBOLS = ['*', '"', '/', '\\', '<', '>', ':', '|', '?']
 
 DATASET_FRANCHISES = {
     row["character"]: row["copyright"]
@@ -53,7 +54,11 @@ def list_files(path="."):
 
     return files
 
-JUNK_FILES = {".ds_store", "thumbs.db", "desktop.ini", ".directory"}
+def clean_file_name(file):
+    for sym in INVALID_SYMBOLS:
+        file = file.replace(sym, "_")
+
+    return file
 
 def remove_empty_folders(path):
     for root, dirs, files in os.walk(path, topdown=False):
@@ -130,12 +135,13 @@ def get_franchise(character):
     return None, character_name
 
 def group_to_franchise(franchise, character, character_count):
+    c = clean_file_name(format_name(character))
+
     if franchise is None:
-        return format_name(character_name)
+        return c
 
-    f = format_name(franchise)
-    c = format_name(character)
-
+    f = clean_file_name(format_name(franchise))
+    
     if (CREATE_CHARACTER_FOLDER and character_count >= CHARACTER_FOLDER_MIN_COUNT):
         return os.path.join(f, c)
 
@@ -150,10 +156,11 @@ def format_name(name):
 
 def move_to_location(file, location):
     create_folder(location)
+    cleaned_name = clean_file_name(os.path.basename(file))
 
     destination = os.path.join(
         location, 
-        os.path.basename(file)
+        cleaned_name
     )
 
     shutil.move(file, destination)
@@ -168,10 +175,11 @@ def copy_to_location(file, character=None):
         path = UNKNOWN_PATH
 
     create_folder(path)
+    cleaned_name = clean_file_name(os.path.basename(file))
 
     destination = os.path.join(
         path, 
-        os.path.basename(file)
+        cleaned_name
     )
 
     shutil.copy2(file, destination)
