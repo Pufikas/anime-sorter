@@ -1,8 +1,10 @@
 {
     "settings": {
         "DEBUG": false,
+        "MODEL": "wd14",
 
         "CONFIDENCE": 0.8,
+        "BATCH_SIZE": 4,
 
         "MULTI_CHARACTER_CONFIDENCE": 0.80,
         "MULTI_CHARACTER_MIN_COUNT": 2,

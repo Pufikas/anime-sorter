@@ -4,15 +4,8 @@ import shutil
 import json
 import onnxruntime as ort
 from tqdm import tqdm
+from PIL import Image
 ort.preload_dlls(directory="")
-
-from imgutils.tagging import get_wd14_tags
-from datasets import load_dataset
-
-dataset = load_dataset(
-    "tirta123/noob-wiki",
-    split="train"
-)
 
 with open("settings.json", "r", encoding="utf-8") as f:
     franchise_data = json.load(f)
@@ -21,6 +14,8 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 
 SETTINGS = franchise_data.get("settings", {})
 DEBUG = SETTINGS.get("DEBUG", False)
+BATCH_SIZE = SETTINGS.get("BATCH_SIZE", 4)
+MODEL = SETTINGS.get("MODEL")
 CONFIDENCE = SETTINGS.get("CONFIDENCE", 0.80)
 CREATE_CHARACTER_FOLDER = SETTINGS.get("CREATE_CHARACTER_FOLDER", True)
 REMOVE_EMPTY_FOLDERS = SETTINGS.get("REMOVE_EMPTY_FOLDERS", True)
@@ -37,13 +32,91 @@ CREATE_BACKUPS = SETTINGS.get("CREATE_BACKUPS", False)
 ALIASES = franchise_data.get("overrides", {})
 CUSTOM_GROUPS = franchise_data.get("franchise_groups", {})
 INVALID_SYMBOLS = ['*', '"', '/', '\\', '<', '>', ':', '|', '?']
+DATASET_FRANCHISES = {}
 
-DATASET_FRANCHISES = {
-    row["character"]: row["copyright"]
-    for row in dataset
-}
+results = [] # final image classification results
 
-results = [] # sorting results
+def load_model():
+    if MODEL == "pixai":
+        analyze_batch = analyze_pixai
+        tagger = load_pixai()
+
+        return analyze_batch, tagger
+
+    elif MODEL == "wd14":
+        analyze_batch = analyze_wd14
+        tagger = load_wd14()
+
+        return analyze_batch, tagger
+    
+    else:
+        raise ValueError(f"Not supported model: {MODEL}")
+
+def load_wd14():
+    from imgutils.tagging import get_wd14_tags
+    from datasets import load_dataset
+
+    global DATASET_FRANCHISES
+
+    dataset = load_dataset(
+        "tirta123/noob-wiki",
+        split="train"
+    )
+
+    DATASET_FRANCHISES = {
+        row["character"]: row["copyright"]
+        for row in dataset
+    }
+
+    return get_wd14_tags
+
+def load_pixai():
+    from transformers import pipeline
+
+    return pipeline(
+        model="pixai-labs/pixai-tagger-v1.0",
+        image_processor="pixai-labs/pixai-tagger-v1.0",
+        trust_remote_code=True
+    )
+
+def analyze_pixai(tagger, files):
+    images = [
+        Image.open(file).convert("RGB")
+        for file in files
+    ]
+
+    batch_results = tagger(
+        images,
+        batch_size = len(images)
+    )
+
+    results = []
+
+    for result in batch_results:
+        r = result["results"]
+
+        results.append({
+            "characters": r["character"],
+            "franchises": r["copyright"]
+        })
+
+    for image in images:
+        image.close()
+
+    return results
+
+def analyze_wd14(tagger, files):
+    results = []
+
+    for file in files:
+        rating, features, characters = tagger(file)
+
+        results.append({
+            "characters": characters,
+            "franchises": get_franchise_scores(characters)
+        })
+
+    return results
 
 def list_files(path="."):
     files = []
@@ -88,8 +161,9 @@ def normalize_characters(characters):
 
     return normalized
 
-def get_character(file):
-    rating, features, characters = get_wd14_tags(file)
+def get_character(file, img_results):
+    characters = img_results["characters"]
+    franchise = img_results["franchises"]
 
     # no data about the image
     if not characters:
@@ -97,7 +171,7 @@ def get_character(file):
             "file": file,
             "character": None,
             "confidence": 0,
-            "franchise": None,
+            "franchise_name": None,
             "franchise_score": 0,
             "multi_character": False,
         })
@@ -106,7 +180,7 @@ def get_character(file):
     # apply user manual overrides
     characters = normalize_characters(characters)
     # sums all characters from X franchise
-    franchise_scores = get_franchise_scores(characters)
+    # franchise_scores = get_franchise_scores(characters) # not needed for pixai as it has this already
     
     if DEBUG:
         tqdm.write(str(characters))
@@ -125,10 +199,10 @@ def get_character(file):
     ]
 
     if len(high_confidence_characters) >= MULTI_CHARACTER_MIN_COUNT:
-        if franchise_scores:
+        if franchise:
             # get highest franchise score
-            franchise, franchise_score = max(
-                franchise_scores.items(),
+            franchise_name, franchise_score = max(
+                franchise.items(),
                 key = lambda item: item[1]
             )
         else:
@@ -140,21 +214,29 @@ def get_character(file):
             "file": file,
             "character": None,
             "confidence": confidence,
-            "franchise": franchise,
+            "franchise_name": franchise_name,
             "franchise_score": franchise_score,
             "multi_character": True,
         })
         return
 
     # single character
-    franchise, character_name = get_franchise(character)
+    # franchise, character_name = get_franchise(character)
+    if franchise:
+        franchise_name, franchise_score = max(
+            franchise.items(),
+            key = lambda item: item[1]
+        )
+    else:
+        franchise_name = None
+        franchise_score = 0
 
     results.append({
         "file": file,
-        "character": character_name,
+        "character": character,
         "confidence": confidence,
-        "franchise": franchise,
-        "franchise_score": franchise_scores.get(franchise, 0),
+        "franchise_name": franchise_name,
+        "franchise_score": franchise_score,
         "multi_character": False,
     })
 
@@ -261,7 +343,7 @@ def finalize():
         file = result["file"]
         character = result["character"]
         confidence = result["confidence"]
-        franchise = result["franchise"]
+        franchise = result["franchise_name"]
         multiple = result["multi_character"]
 
         # multiple characters, move to franchise if any
@@ -306,7 +388,7 @@ def print_results():
     for result in results:
         character = result["character"]
         confidence = result["confidence"]
-        franchise = result["franchise"] or None
+        franchise = result["franchise_name"] or None
 
         if result["multi_character"]:
             multiple[franchise] += 1
@@ -335,9 +417,18 @@ def print_results():
         if multiple[franchise]:
             print(f"  {'multiple':<25} {multiple[franchise]}")
 
-files = list_files(INPUT_PATH)
+files = list_files(INPUT_PATH) # read files
+analyze_batch, tagger = load_model() # get analyze and tag method
 
-for file in tqdm(files, desc="Analyzing", unit="image"):
-    get_character(file)
-    
+for i in tqdm(
+        range(0, len(files), BATCH_SIZE), 
+        desc = "Analyzing", unit = "batch"
+    ):
+
+    batch = files[i:i + BATCH_SIZE]
+    batch_results = analyze_batch(tagger, batch)
+
+    for file, result in zip(batch, batch_results):
+        get_character(file, result)
+
 finalize()

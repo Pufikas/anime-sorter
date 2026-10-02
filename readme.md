@@ -25,7 +25,7 @@ Unrecognized or low-confidence characters are placed in the `unknown` folder.
 1. Create a Python virtual environment:
 
 ```bash
-python3 -m venv pyenv
+python -m venv pyenv
 ```
 2. Use the created virtual environment:
 
