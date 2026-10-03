@@ -1,9 +1,9 @@
 {
     "settings": {
-        "DEBUG": false,
-        "MODEL": "wd14",
+        "DEBUG": true,
+        "MODEL": "pixai_onnx",
 
-        "CONFIDENCE": 0.8,
+        "CONFIDENCE": 0.7,
         "BATCH_SIZE": 4,
 
         "MULTI_CHARACTER_CONFIDENCE": 0.80,

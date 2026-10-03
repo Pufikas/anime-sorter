@@ -1,0 +1,3 @@
+https://huggingface.co/noaione/pixai-tagger-v1.0-onnx/tree/main
+
+https://huggingface.co/A1yCE/pixai-tagger-v1.0-onnx-fp16/tree/main

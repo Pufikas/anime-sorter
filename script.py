@@ -5,6 +5,8 @@ import json
 import onnxruntime as ort
 from tqdm import tqdm
 from PIL import Image
+from utils.pixai_onnx_wrapper import PixAIOnnxTagger
+
 ort.preload_dlls(directory="")
 
 with open("settings.json", "r", encoding="utf-8") as f:
@@ -36,6 +38,9 @@ DATASET_FRANCHISES = {}
 
 results = [] # final image classification results
 
+if DEBUG:
+    print(ort.get_available_providers())
+
 def load_model():
     if MODEL == "pixai":
         analyze_batch = analyze_pixai
@@ -49,6 +54,13 @@ def load_model():
 
         return analyze_batch, tagger
     
+    elif MODEL == "pixai_onnx":
+        analyze_batch = analyze_pixai_onnx
+        tagger = load_pixai_onnx()
+
+        return analyze_batch, tagger
+    
+
     else:
         raise ValueError(f"Not supported model: {MODEL}")
 
@@ -79,6 +91,34 @@ def load_pixai():
         trust_remote_code=True
     )
 
+def load_pixai_onnx():
+    import json
+    import onnxruntime as ort
+
+    # using onnx model https://huggingface.co/A1yCE/pixai-tagger-v1.0-onnx-fp16
+    model_path = "model/pixai-tagger/model.onnx"
+    tags_path = "model/pixai-tagger/tags.json"
+
+    session_options = ort.SessionOptions()
+
+    session_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    session_options.enable_mem_pattern = False
+
+    session = ort.InferenceSession(
+        model_path,
+        sess_options=session_options,
+        providers=[
+            "DmlExecutionProvider",
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+        ]
+    )
+
+    with open(tags_path, "r", encoding="utf-8") as f:
+        tags = json.load(f)
+
+    return PixAIOnnxTagger(session, tags)
+    
 def analyze_pixai(tagger, files):
     images = [
         Image.open(file).convert("RGB")
@@ -102,6 +142,29 @@ def analyze_pixai(tagger, files):
 
     for image in images:
         image.close()
+
+    return results
+
+def analyze_pixai_onnx(tagger, files):
+    results = []
+
+    for file in files:
+        result = tagger(file)
+
+        characters = {
+            item["tag"]: item["confidence"]
+            for item in result["characters"]
+        }
+
+        franchises = {
+            item["tag"]: item["confidence"]
+            for item in result["franchises"]
+        }
+
+        results.append({
+            "characters": characters,
+            "franchises": franchises,
+        })
 
     return results
 
@@ -181,9 +244,10 @@ def get_character(file, img_results):
     characters = normalize_characters(characters)
     # sums all characters from X franchise
     # franchise_scores = get_franchise_scores(characters) # not needed for pixai as it has this already
-    
+
     if DEBUG:
-        tqdm.write(str(characters))
+        tqdm.write(f"Characters: {characters}")
+        tqdm.write(f"Copyright: {franchise}\n")
 
     # single character highest confidence
     character, confidence = max(
@@ -206,7 +270,7 @@ def get_character(file, img_results):
                 key = lambda item: item[1]
             )
         else:
-            franchise = None
+            franchise_name = None
             franchise_score = 0
 
         # character is none to avoid creating character folder
