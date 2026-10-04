@@ -120,7 +120,7 @@ Place the images *(or folders with images)* you want to sort in the input folder
 python script.py
 ```
 
-## settings json
+## settingsjson
 
 Custom character grouping and overrides can be configured in:
 
