@@ -1,8 +1,16 @@
 # anime-sorter
 
-Detects anime characters from images and sorts them into folders.
+Detects anime characters from images and automatically sorts them into character and franchise folders.
 
-Uses the [tirta123/noob-wiki](https://huggingface.co/datasets/tirta123/noob-wiki) dataset to automatically determine character franchises.
+Supported models:
+
+| Model        | Speed  | VRAM   | Backend | Best for                   |
+| ------------ | ------ | ------ | ------- | -------------------------- |
+| `wd14`       | Fast   | Low    | ONNX    | Older/weaker hardware      |
+| `pixai_onnx` | Medium | Medium | ONNX    | AMD DirectML / NVIDIA CUDA |
+| `pixai`      | Slow   | High   | PyTorch | Best PixAI v1.0 experience |
+
+The `wd14` model uses the [tirta123/noob-wiki](https://huggingface.co/datasets/tirta123/noob-wiki) dataset to determine character franchises.
 
 > [!WARNING]
 > Character detection and franchise grouping may not always be correct. It is recommended to briefly check the generated folders after sorting.
@@ -16,9 +24,37 @@ Unrecognized or low-confidence characters are placed in the `unknown` folder.
 ## Requirements
 
 - Python 3
-- NVIDIA GPU for CUDA acceleration, **or**
-- Compatible AMD GPU for ROCm/MIGraphX acceleration, **or**
-- CPU
+- GPU acceleration is optional
+- Enough RAM
+
+Supported acceleration depends on the selected model and your hardware:
+
+* NVIDIA GPU - CUDA *(best use case)*
+* AMD GPU on Windows - **DirectML** for ONNX models
+* AMD GPU on Linux - **ROCm/ONNX Runtime**, depending on compatibility
+* CPU is also supported, but significantly slower for larger models
+
+
+### Model requirements
+
+#### `wd14`
+
+Uses `imgutils` and ONNX Runtime.
+
+This is the lightest model and is recommended for weaker hardware.
+
+#### `pixai`
+
+Uses PyTorch and Transformers.
+
+This is the heaviest model and requires significantly more VRAM/RAM.
+
+#### `pixai_onnx`
+
+Uses the ONNX version of PixAI Tagger v0.9.
+
+This avoids the PyTorch/Transformers requirements of the normal PixAI model and can use ONNX Runtime backends such as CUDA or DirectML.
+
 
 ## Setup
 
@@ -60,16 +96,21 @@ The exact CUDA/cuDNN requirements depend on the installed ONNX Runtime version a
 ```bash
 pip install onnxruntime-directml
 ```
+> [!IMPORTANT]
+> The normal `pixai` model uses PyTorch rather than ONNX Runtime. AMD Windows support therefore depends on PyTorch/DirectML compatibility and may require an older Python version.
+>
+> Python 3.12 is recommended if the normal `pixai` model cannot be installed correctly on newer Python versions.
 
 #### AMD GPU / Rocm (Linux)
-```bash
-pip3 install https://repo.radeon.com/rocm/manylinux/rocm-rel-6.1.3/onnxruntime_rocm-1.17.0-cp310-cp310-linux_x86_64.whl numpy==1.26.4
-```
+
+ONNX Runtime ROCm support depends on the ROCm and ONNX Runtime versions being compatible with your GPU and Linux installation.
 
 #### CPU only
 ```bash
 pip install -r requirements-cpu.txt
 ```
+
+CPU inference works with all supported models, but heavier models will be a lot slower.
 
 4. Usage
 
@@ -79,18 +120,27 @@ Place the images *(or folders with images)* you want to sort in the input folder
 python script.py
 ```
 
-## settingsjson
+## settings json
 
 Custom character grouping and overrides can be configured in:
 
 ```json
 {
     "settings": {
-        "CONFIDENCE": 0.80, // 1 is highest
-        
-        "CREATE_CHARACTER_FOLDER": true, // create folder for character?
-        "CHARACTER_FOLDER_MIN_COUNT": 15, // min count of images to create the character name folder
-        "REMOVE_EMPTY_FOLDERS": true, // remove empty folders in INPUT_PATH?
+        "DEBUG": false,
+        "MODEL": "wd14", // model to use supported are: ["pixai", "wd14", "pixai_onnx"], wd14 being the lightest and only having data up to 2024 while pixai is the heaviest with up to 2026 data
+
+        "CONFIDENCE": 0.80, // 1 is highest, used for single character images
+        "BATCH_SIZE": 6, // how many images to analyze per batch? more ==> more vram usage and faster processing
+        "MULTI_CHARACTER_CONFIDENCE": 0.80, // used when determining whether multiple characters are present
+        "MULTI_CHARACTER_MIN_COUNT": 2, // number of characters that must pass the multi-character confidence threshold before an image is treated as containing multiple characters
+
+        "CREATE_CHARACTER_FOLDER": true, // create folder for character? if false moves the image into franchise folder only
+        "CHARACTER_FOLDER_MIN_COUNT": 15, // min number of images required before creating a character folder
+
+        "REMOVE_EMPTY_FOLDERS": true, // removes empty directories left in the input directory after sorting
+
+        "CREATE_BACKUPS": false, // if enabled, images are copied to `BACKUP_PATH` before being moved.
 
         "INPUT_PATH": "sorter/input", // input folder to process images from
         "UNKNOWN_PATH": "sorter/unknown", // not recognized images
@@ -98,12 +148,8 @@ Custom character grouping and overrides can be configured in:
         "BACKUP_PATH": "sorter/backup" // path to backup images from INPUT_PATH
     },
 
-    "overrides": {
-        "sakura_miku": "hatsune_miku", // detected character name, overriden to character name
-        "racing_miku": "hatsune_miku",
-        "snow_miku": "hatsune_miku",
-        "uruha_rushia_(3rd_costume)": "uruha_rushia",
-        "boo_tao": "hu_tao"
+    "overrides": { 
+        "boo_tao_(genshin_impact)": "hu_tao_(genshin_impact)" // detected character name, overriden to character name, currently must be with franchise tag
     },
 
     "franchise_groups": {
