@@ -1,12 +1,7 @@
 class PixAIOnnxTagger:
     def __init__(self, session, tags):
         self.session = session
-
-        # converts the tag list into a dictionary to use self.tags["character"] and self.tags["copyright"]
-        self.tags = {
-            category["name"]: category
-            for category in tags["categories"]
-        }
+        self.tags = tags
 
         self.input_name = session.get_inputs()[0].name
         self.output_name = session.get_outputs()[0].name
@@ -35,23 +30,23 @@ class PixAIOnnxTagger:
         character = [] # char names
         copyright = [] # franchise names
 
-        for category_name, destination in (
-            ("character", character),
-            ("copyright", copyright)
-        ):
-            category = self.tags[category_name]
+        for i, tag in self.tags["character"]:
+            probability = float(probabilities[i])
 
-            offset = category["offset"]
-            tag_names = category["tags"]
+            if probability >= 0.5:
+                character.append({
+                    "tag": tag,
+                    "confidence": probability
+                })
 
-            for i, tag in enumerate(tag_names):
-                probability = float(probabilities[offset + i])
+        for index, tag in self.tags["copyright"]:
+            probability = float(probabilities[index])
 
-                if probability >= 0.5:
-                    destination.append({
-                        "tag": tag,
-                        "confidence": probability
-                    })
+            if probability >= 0.5:
+                copyright.append({
+                    "tag": tag,
+                    "confidence": probability
+                })
 
         return {
             "characters": character,
@@ -96,3 +91,51 @@ class PixAIOnnxTagger:
         array = np.expand_dims(array, axis = 0)
 
         return array
+
+def load_tags_json(tags_path):
+    import json
+
+    with open(tags_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    tags = {
+        category["name"]: category
+        for category in data["categories"]
+    }
+
+    return {
+        "character": [
+            (tags["character"]["offset"] + i, tag)
+            for i, tag in enumerate(tags["character"]["tags"])
+        ],
+
+        "copyright": [
+            (tags["copyright"]["offset"] + i, tag)
+            for i, tag in enumerate(tags["copyright"]["tags"])
+        ]
+    }
+
+def load_tags_csv(tags_path):
+    import csv
+
+    tags = {
+        "character": [],
+        "copyright": []
+    }
+
+    with open(tags_path, "r", encoding="utf-8") as f:
+        reader = csv.reader(f)
+
+        next(reader) # skips first line (header)
+
+        for index, row in enumerate(reader):
+            tag = row[1]
+            category = int(row[2])
+
+            if category == 4:
+                tags["character"].append((index, tag))
+
+            elif category == 3:
+                tags["copyright"].append((index, tag))
+
+    return tags

@@ -9,6 +9,7 @@ Supported models:
 | `wd14`       | Fast   | Low    | ONNX    | Older/weaker hardware      |
 | `pixai_onnx` | Medium | Medium | ONNX    | AMD DirectML / NVIDIA CUDA |
 | `pixai`      | Slow   | High   | PyTorch | Best PixAI v1.0 experience |
+| `pixai_onnx_fp32`      | Medium/Slow   | High   | ONNX | Best For AMD on Windows |
 
 The `wd14` model uses the [tirta123/noob-wiki](https://huggingface.co/datasets/tirta123/noob-wiki) dataset to determine character franchises.
 
@@ -96,6 +97,8 @@ The exact CUDA/cuDNN requirements depend on the installed ONNX Runtime version a
 ```bash
 pip install onnxruntime-directml
 ```
+You will need to get [model_fp16.onnx](https://huggingface.co/Mexes/pixai-tagger-v1.0-onnx-fp32-fp16-int8)
+
 > [!IMPORTANT]
 > The normal `pixai` model uses PyTorch rather than ONNX Runtime. AMD Windows support therefore depends on PyTorch/DirectML compatibility and may require an older Python version.
 >

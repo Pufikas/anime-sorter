@@ -5,7 +5,7 @@ import json
 import onnxruntime as ort
 from tqdm import tqdm
 from PIL import Image
-from utils.pixai_onnx_wrapper import PixAIOnnxTagger
+import utils.pixai_onnx_wrapper as Utils
 
 ort.preload_dlls(directory="")
 
@@ -36,33 +36,58 @@ CUSTOM_GROUPS = franchise_data.get("franchise_groups", {})
 INVALID_SYMBOLS = ['*', '"', '/', '\\', '<', '>', ':', '|', '?']
 DATASET_FRANCHISES = {}
 
+# default model paths
+DEF_MODEL_PATH = "model/pixai-tagger/model.onnx"
+DEF_MODEL_TAGS = "model/pixai-tagger/tags.json"
+
 results = [] # final image classification results
 
 if DEBUG:
     print(ort.get_available_providers())
 
 def load_model():
-    if MODEL == "pixai":
-        analyze_batch = analyze_pixai
-        tagger = load_pixai()
-
-        return analyze_batch, tagger
-
-    elif MODEL == "wd14":
-        analyze_batch = analyze_wd14
-        tagger = load_wd14()
-
-        return analyze_batch, tagger
-    
-    elif MODEL == "pixai_onnx":
-        analyze_batch = analyze_pixai_onnx
-        tagger = load_pixai_onnx()
-
-        return analyze_batch, tagger
-    
-
-    else:
+    try:
+        analyze_batch, load = MODELS[MODEL]
+    except KeyError:
         raise ValueError(f"Not supported model: {MODEL}")
+
+    return analyze_batch, load()
+
+def load_pixai_onnx_directml():
+    # using https://huggingface.co/Mexes/pixai-tagger-v1.0-onnx-fp32-fp16-int8
+    import onnxruntime as ort
+    
+    session = ort.InferenceSession(
+        "model/pixai-tagger/model_fp16.onnx",
+        providers=[
+            ("DmlExecutionProvider", {"device_id": 0}), 
+            "CUDAExecutionProvider", 
+            "CPUExecutionProvider"
+        ]
+    )
+
+    tags = Utils.load_tags_csv("model/pixai-tagger/selected_tags.csv")
+
+    return Utils.PixAIOnnxTagger(session, tags)
+
+def load_pixai_onnx():
+    import onnxruntime as ort
+
+    session_options = ort.SessionOptions()
+    session_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    session_options.enable_mem_pattern = False
+
+    session = ort.InferenceSession(
+        model_path = "model/pixai-tagger/model.onnx",
+        sess_options = session_options,
+        providers = [
+            "DmlExecutionProvider",
+            "CUDAExecutionProvider",
+            "CPUExecutionProvider"
+        ]
+    )
+
+    return Utils.PixAIOnnxTagger(session, tags)
 
 def load_wd14():
     from imgutils.tagging import get_wd14_tags
@@ -90,34 +115,6 @@ def load_pixai():
         image_processor="pixai-labs/pixai-tagger-v1.0",
         trust_remote_code=True
     )
-
-def load_pixai_onnx():
-    import json
-    import onnxruntime as ort
-
-    # using onnx model https://huggingface.co/A1yCE/pixai-tagger-v1.0-onnx-fp16
-    model_path = "model/pixai-tagger/model.onnx"
-    tags_path = "model/pixai-tagger/tags.json"
-
-    session_options = ort.SessionOptions()
-
-    session_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-    session_options.enable_mem_pattern = False
-
-    session = ort.InferenceSession(
-        model_path,
-        sess_options=session_options,
-        providers=[
-            "DmlExecutionProvider",
-            "CUDAExecutionProvider",
-            "CPUExecutionProvider"
-        ]
-    )
-
-    with open(tags_path, "r", encoding="utf-8") as f:
-        tags = json.load(f)
-
-    return PixAIOnnxTagger(session, tags)
     
 def analyze_pixai(tagger, files):
     images = [
@@ -436,7 +433,6 @@ def finalize():
             copy_to_location(file, BACKUP_PATH)
         
         move_to_location(file, os.path.join(OUTPUT_PATH, character_path))
-        
 
     if REMOVE_EMPTY_FOLDERS:
         remove_empty_folders(INPUT_PATH)
@@ -466,8 +462,6 @@ def print_results():
         recognized += 1
         franchises[franchise][character] += 1
 
-        
-
     print(f"\nRecognized         {recognized}")
     print(f"Unknown            {unknown}")
     print(f"Multiple           {sum(multiple.values())}\n")
@@ -480,6 +474,14 @@ def print_results():
 
         if multiple[franchise]:
             print(f"  {'multiple':<25} {multiple[franchise]}")
+
+# list of supported models
+MODELS = {
+    "wd14": (analyze_wd14, load_wd14),
+    "pixai": (analyze_pixai, load_pixai),
+    "pixai_onnx": (analyze_pixai_onnx, load_pixai_onnx),
+    "pixai_onnx_directml": (analyze_pixai_onnx, load_pixai_onnx_directml),
+}
 
 files = list_files(INPUT_PATH) # read files
 analyze_batch, tagger = load_model() # get analyze and tag method

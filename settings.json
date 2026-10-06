@@ -1,7 +1,7 @@
 {
     "settings": {
         "DEBUG": true,
-        "MODEL": "pixai_onnx",
+        "MODEL": "pixai_onnx_directml",
 
         "CONFIDENCE": 0.7,
         "BATCH_SIZE": 4,
